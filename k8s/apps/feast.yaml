@@ -1,0 +1,101 @@
+###############################################################################
+# Feast Feature Store — k8s manifests
+#
+# Includes:
+#   • PersistentVolumeClaim  — stores registry.db and Parquet offline snapshots
+#   • Deployment             — runs feast apply + materialize + feast serve
+#   • Service                — ClusterIP on port 6566 (internal feature serving)
+#
+# The ranking features (user_stats, post_stats, user_author_affinity) are
+# materialised from TiDB into the Redis online store on container startup,
+# and again after seeding via:
+#   kubectl exec -n social-feed deploy/feast-feature-store -- \
+#       python /feature-repo/scripts/materialize_features.py
+###############################################################################
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: feast-data-pvc
+  namespace: social-feed
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feast-feature-store
+  namespace: social-feed
+  labels:
+    app: feast-feature-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: feast-feature-store
+  template:
+    metadata:
+      labels:
+        app: feast-feature-store
+    spec:
+      containers:
+        - name: feast-feature-store
+          image: social-feed/feast-feature-store:latest
+          imagePullPolicy: Never        # k3s local image — no registry needed
+          ports:
+            - containerPort: 6566
+          env:
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: TIDB_HOST
+              value: tidb
+            - name: TIDB_PORT
+              value: "3306"
+            - name: TIDB_DATABASE
+              value: social_feed
+          volumeMounts:
+            - name: feast-data
+              mountPath: /feature-repo/data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 6566
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 6566
+            initialDelaySeconds: 90
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: feast-data
+          persistentVolumeClaim:
+            claimName: feast-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feast-feature-store
+  namespace: social-feed
+spec:
+  selector:
+    app: feast-feature-store
+  ports:
+    - name: http
+      port: 6566
+      targetPort: 6566
+  type: ClusterIP

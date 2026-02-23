@@ -1,0 +1,113 @@
+---
+# TiDB — production-grade distributed SQL (MySQL compatible)
+# For k3s single-node learning we deploy a standalone TiDB instance.
+# For a real cluster you would use the TiDB Operator:
+#   https://docs.pingcap.com/tidb-in-kubernetes/stable
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tidb
+  namespace: social-feed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tidb
+  template:
+    metadata:
+      labels:
+        app: tidb
+    spec:
+      containers:
+        - name: tidb
+          # For learning we use MySQL 8.0 (wire-compatible with TiDB)
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ALLOW_EMPTY_PASSWORD
+              value: "yes"
+            - name: MYSQL_DATABASE
+              value: social_feed
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: tidb-pvc
+        - name: init-sql
+          configMap:
+            name: db-init-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tidb
+  namespace: social-feed
+spec:
+  selector:
+    app: tidb
+  ports:
+    - port: 4000
+      targetPort: 3306
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tidb-pvc
+  namespace: social-feed
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi
+---
+# ConfigMap holding the DB schema — mounted into the MySQL init dir
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-sql
+  namespace: social-feed
+data:
+  init-db.sql: |
+    CREATE TABLE IF NOT EXISTS users (
+      user_id VARCHAR(36) PRIMARY KEY,
+      username VARCHAR(100) UNIQUE NOT NULL,
+      display_name VARCHAR(255),
+      interest_vector JSON,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id VARCHAR(36) NOT NULL,
+      followee_id VARCHAR(36) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (follower_id, followee_id),
+      INDEX idx_followee (followee_id)
+    );
+    CREATE TABLE IF NOT EXISTS posts (
+      post_id VARCHAR(36) PRIMARY KEY,
+      user_id VARCHAR(36) NOT NULL,
+      content TEXT,
+      media_key VARCHAR(500),
+      media_type VARCHAR(20),
+      like_count INT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_posts_user (user_id),
+      INDEX idx_posts_created (created_at)
+    );
+    CREATE TABLE IF NOT EXISTS likes (
+      user_id VARCHAR(36) NOT NULL,
+      post_id VARCHAR(36) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, post_id)
+    );

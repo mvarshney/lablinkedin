@@ -1,0 +1,40 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+
+# Settings
+pydantic-settings==2.6.1
+
+# Database (TiDB/MySQL async)
+sqlalchemy[asyncio]==2.0.36
+aiomysql==0.2.0
+
+# Messaging
+aiokafka==0.11.0
+
+# Redis
+redis[asyncio]==5.2.0
+
+# Vector DB
+qdrant-client==1.12.1
+
+# Object Storage (MinIO / S3)
+boto3==1.35.74
+
+# HTTP client (Pinot + Ranking service + Feast Feature Server)
+httpx==0.28.0
+
+# Numerical ops — cosine similarity for topic_similarity cross-feature
+numpy==1.26.4
+
+# OpenTelemetry tracing
+opentelemetry-sdk==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-httpx==0.50b0
+opentelemetry-instrumentation-redis==0.50b0
+opentelemetry-instrumentation-sqlalchemy==0.50b0
+opentelemetry-exporter-otlp-proto-grpc==1.29.0
+
+# Prometheus metrics
+prometheus-client==0.21.1

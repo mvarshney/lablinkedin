@@ -1,0 +1,62 @@
+---
+# Embedding Worker
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-worker
+  namespace: social-feed
+spec:
+  replicas: 2   # scale out for higher post throughput
+  selector:
+    matchLabels:
+      app: embedding-worker
+  template:
+    metadata:
+      labels:
+        app: embedding-worker
+    spec:
+      containers:
+        - name: embedding-worker
+          image: social-feed/embedding-worker:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: app-config
+          resources:
+            requests:
+              memory: "512Mi"   # sentence-transformers needs ~300MB
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+---
+# Fan-out Worker
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fanout-worker
+  namespace: social-feed
+spec:
+  replicas: 3   # more parallelism reduces fan-out latency
+  selector:
+    matchLabels:
+      app: fanout-worker
+  template:
+    metadata:
+      labels:
+        app: fanout-worker
+    spec:
+      containers:
+        - name: fanout-worker
+          image: social-feed/fanout-worker:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: app-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

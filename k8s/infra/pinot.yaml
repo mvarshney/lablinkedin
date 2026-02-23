@@ -1,0 +1,129 @@
+---
+# Apache Pinot — real-time OLAP for impression tracking
+# Three-component deployment: Controller → Broker → Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pinot-controller
+  namespace: social-feed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pinot-controller
+  template:
+    metadata:
+      labels:
+        app: pinot-controller
+    spec:
+      containers:
+        - name: pinot-controller
+          image: apachepinot/pinot:1.2.0
+          args: ["StartController", "-zkAddress", "zookeeper:2181"]
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          volumeMounts:
+            - name: data
+              mountPath: /opt/pinot/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pinot-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pinot-controller
+  namespace: social-feed
+spec:
+  selector:
+    app: pinot-controller
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pinot-broker
+  namespace: social-feed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pinot-broker
+  template:
+    metadata:
+      labels:
+        app: pinot-broker
+    spec:
+      containers:
+        - name: pinot-broker
+          image: apachepinot/pinot:1.2.0
+          args: ["StartBroker", "-zkAddress", "zookeeper:2181"]
+          ports:
+            - containerPort: 8099
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pinot-broker
+  namespace: social-feed
+spec:
+  selector:
+    app: pinot-broker
+  ports:
+    - port: 8099
+      targetPort: 8099
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pinot-server
+  namespace: social-feed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pinot-server
+  template:
+    metadata:
+      labels:
+        app: pinot-server
+    spec:
+      containers:
+        - name: pinot-server
+          image: apachepinot/pinot:1.2.0
+          args: ["StartServer", "-zkAddress", "zookeeper:2181"]
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pinot-pvc
+  namespace: social-feed
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi

@@ -1,0 +1,12 @@
+# Feast feature store with Redis online store
+feast[redis]==0.40.1
+
+# Offline store data manipulation
+pandas==2.2.3
+pyarrow==17.0.0
+
+# TiDB / MySQL connector (for materialize_features.py)
+PyMySQL==1.1.1
+
+# Numerical ops (cosine similarity in on_demand_features.py)
+numpy==1.26.4
