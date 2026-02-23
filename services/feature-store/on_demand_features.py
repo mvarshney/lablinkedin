@@ -25,7 +25,8 @@ import json
 
 import numpy as np
 import pandas as pd
-from feast import Field, on_demand_feature_view
+from feast import Field
+from feast.on_demand_feature_view import on_demand_feature_view
 from feast.types import Float32
 
 from feature_views import post_stats, user_stats
