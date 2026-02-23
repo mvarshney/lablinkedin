@@ -74,7 +74,8 @@ async def create_post(body: PostCreate, db: AsyncSession = Depends(get_db)):
             media_type=body.media_type,
         )
         db.add(post)
-        await db.flush()   # materialise post_id
+        await db.flush()     # materialise post_id
+        await db.refresh(post)  # load server-generated fields (created_at)
 
         span.set_attribute("post.id", post.post_id)
         span.set_attribute("post.user_id", post.user_id)

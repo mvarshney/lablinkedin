@@ -46,7 +46,8 @@ async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
 
         user = User(username=body.username, display_name=body.display_name)
         db.add(user)
-        await db.flush()  # get user_id before commit
+        await db.flush()    # get user_id before commit
+        await db.refresh(user)  # load server-generated fields (created_at)
 
         # Seed a random interest vector — gives the discovery engine something
         # to work with before the user has any interaction history.
