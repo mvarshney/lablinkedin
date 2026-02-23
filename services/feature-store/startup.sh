@@ -65,45 +65,50 @@ sed -i "s|connection_string: \"redis:6379\"|connection_string: \"${REDIS_HOST}:$
 echo "[feast-startup] Ensuring Parquet stub files exist ..."
 python3 - <<'PYEOF'
 import os
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 DATA_DIR = "/feature-repo/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Use explicit PyArrow schemas so column types are preserved with 0 rows.
+# dtype="str" in pandas maps to object, which pyarrow stores as null in empty
+# files — causing Feast's schema inference to raise ValueType.NULL errors.
 stubs = {
-    "user_stats.parquet": {
-        "user_id":               pd.Series([], dtype="str"),
-        "follower_count":        pd.Series([], dtype="int64"),
-        "following_count":       pd.Series([], dtype="int64"),
-        "total_posts":           pd.Series([], dtype="int64"),
-        "avg_engagement_rate":   pd.Series([], dtype="float32"),
-        "interest_vector_json":  pd.Series([], dtype="str"),
-        "event_timestamp":       pd.Series([], dtype="datetime64[us, UTC]"),
-    },
-    "post_stats.parquet": {
-        "post_id":               pd.Series([], dtype="str"),
-        "author_id":             pd.Series([], dtype="str"),
-        "like_count":            pd.Series([], dtype="int64"),
-        "comment_count":         pd.Series([], dtype="int64"),
-        "has_media":             pd.Series([], dtype="int64"),
-        "content_length":        pd.Series([], dtype="int64"),
-        "author_follower_count": pd.Series([], dtype="int64"),
-        "embedding_json":        pd.Series([], dtype="str"),
-        "event_timestamp":       pd.Series([], dtype="datetime64[us, UTC]"),
-    },
-    "user_author_affinity.parquet": {
-        "user_id":           pd.Series([], dtype="str"),
-        "author_id":         pd.Series([], dtype="str"),
-        "interaction_count": pd.Series([], dtype="int64"),
-        "affinity_score":    pd.Series([], dtype="float32"),
-        "event_timestamp":   pd.Series([], dtype="datetime64[us, UTC]"),
-    },
+    "user_stats.parquet": pa.schema([
+        pa.field("user_id",              pa.string()),
+        pa.field("follower_count",       pa.int64()),
+        pa.field("following_count",      pa.int64()),
+        pa.field("total_posts",          pa.int64()),
+        pa.field("avg_engagement_rate",  pa.float32()),
+        pa.field("interest_vector_json", pa.string()),
+        pa.field("event_timestamp",      pa.timestamp("us", tz="UTC")),
+    ]),
+    "post_stats.parquet": pa.schema([
+        pa.field("post_id",               pa.string()),
+        pa.field("author_id",             pa.string()),
+        pa.field("like_count",            pa.int64()),
+        pa.field("comment_count",         pa.int64()),
+        pa.field("has_media",             pa.int64()),
+        pa.field("content_length",        pa.int64()),
+        pa.field("author_follower_count", pa.int64()),
+        pa.field("embedding_json",        pa.string()),
+        pa.field("event_timestamp",       pa.timestamp("us", tz="UTC")),
+    ]),
+    "user_author_affinity.parquet": pa.schema([
+        pa.field("user_id",          pa.string()),
+        pa.field("author_id",        pa.string()),
+        pa.field("interaction_count", pa.int64()),
+        pa.field("affinity_score",   pa.float32()),
+        pa.field("event_timestamp",  pa.timestamp("us", tz="UTC")),
+    ]),
 }
 
-for filename, columns in stubs.items():
+for filename, schema in stubs.items():
     path = os.path.join(DATA_DIR, filename)
     if not os.path.exists(path):
-        pd.DataFrame(columns).to_parquet(path, index=False)
+        table = pa.table({f.name: pa.array([], type=f.type) for f in schema}, schema=schema)
+        pq.write_table(table, path)
         print(f"  Created stub: {path}")
     else:
         print(f"  Already exists: {path}")
