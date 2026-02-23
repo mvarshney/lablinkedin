@@ -44,11 +44,13 @@ services:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
@@ -61,11 +63,13 @@ services:
       - redis-data:/data
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
 
   # ── Zookeeper (required by Kafka and Pinot) ───────────────────────────────
   zookeeper:
@@ -78,11 +82,13 @@ services:
       - zookeeper-data:/var/lib/zookeeper
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2181"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   # ── Kafka ─────────────────────────────────────────────────────────────────
   kafka:
@@ -107,11 +113,13 @@ services:
       - kafka-data:/var/lib/kafka/data
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 15s
       timeout: 10s
       retries: 10
+      start_period: 30s
 
   # ── Qdrant ────────────────────────────────────────────────────────────────
   qdrant:
@@ -124,11 +132,13 @@ services:
       - qdrant-data:/qdrant/storage
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/readyz 2>/dev/null | grep -q '\"status\":\"ok\"' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   # ── MinIO ─────────────────────────────────────────────────────────────────
   minio:
@@ -145,11 +155,13 @@ services:
       - minio-data:/data
     networks:
       - feed-net
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 15s
 
   # ── Apache Pinot ──────────────────────────────────────────────────────────
   # Single-node quickstart; splits into Controller + Broker + Server
@@ -272,6 +284,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 12
+      start_period: 45s
     restart: unless-stopped
 
 # ─────────────────────────── Application Services ─────────────────────────
