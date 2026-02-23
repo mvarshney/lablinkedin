@@ -106,12 +106,11 @@ stubs = {
 
 for filename, schema in stubs.items():
     path = os.path.join(DATA_DIR, filename)
-    if not os.path.exists(path):
-        table = pa.table({f.name: pa.array([], type=f.type) for f in schema}, schema=schema)
-        pq.write_table(table, path)
-        print(f"  Created stub: {path}")
-    else:
-        print(f"  Already exists: {path}")
+    # Always recreate stubs so schema is correct even after bad previous runs.
+    # materialize_features.py overwrites these with real data immediately after.
+    table = pa.table({f.name: pa.array([], type=f.type) for f in schema}, schema=schema)
+    pq.write_table(table, path)
+    print(f"  Wrote stub: {path}")
 PYEOF
 
 # ── feast apply ───────────────────────────────────────────────────────────────
