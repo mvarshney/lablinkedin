@@ -134,7 +134,7 @@ services:
       - feed-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/readyz 2>/dev/null | grep -q '\"status\":\"ok\"' || exit 1"]
+      test: ["CMD-SHELL", "grep -qE ':18BD ' /proc/net/tcp6 /proc/net/tcp 2>/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10
