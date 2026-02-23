@@ -58,6 +58,57 @@ PYEOF
 sed -i "s|connection_string: \"redis:6379\"|connection_string: \"${REDIS_HOST}:${REDIS_PORT}\"|g" \
     /feature-repo/feature_store.yaml
 
+# ── Create stub Parquet files if they don't exist ─────────────────────────────
+# feast apply infers feature schema by reading the FileSource Parquet files.
+# They must exist (even as empty stubs) before apply runs — the real data is
+# written later by materialize_features.py after the DB has been seeded.
+echo "[feast-startup] Ensuring Parquet stub files exist ..."
+python3 - <<'PYEOF'
+import os
+import pandas as pd
+
+DATA_DIR = "/feature-repo/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+stubs = {
+    "user_stats.parquet": {
+        "user_id":               pd.Series([], dtype="str"),
+        "follower_count":        pd.Series([], dtype="int64"),
+        "following_count":       pd.Series([], dtype="int64"),
+        "total_posts":           pd.Series([], dtype="int64"),
+        "avg_engagement_rate":   pd.Series([], dtype="float32"),
+        "interest_vector_json":  pd.Series([], dtype="str"),
+        "event_timestamp":       pd.Series([], dtype="datetime64[us, UTC]"),
+    },
+    "post_stats.parquet": {
+        "post_id":               pd.Series([], dtype="str"),
+        "author_id":             pd.Series([], dtype="str"),
+        "like_count":            pd.Series([], dtype="int64"),
+        "comment_count":         pd.Series([], dtype="int64"),
+        "has_media":             pd.Series([], dtype="int64"),
+        "content_length":        pd.Series([], dtype="int64"),
+        "author_follower_count": pd.Series([], dtype="int64"),
+        "embedding_json":        pd.Series([], dtype="str"),
+        "event_timestamp":       pd.Series([], dtype="datetime64[us, UTC]"),
+    },
+    "user_author_affinity.parquet": {
+        "user_id":           pd.Series([], dtype="str"),
+        "author_id":         pd.Series([], dtype="str"),
+        "interaction_count": pd.Series([], dtype="int64"),
+        "affinity_score":    pd.Series([], dtype="float32"),
+        "event_timestamp":   pd.Series([], dtype="datetime64[us, UTC]"),
+    },
+}
+
+for filename, columns in stubs.items():
+    path = os.path.join(DATA_DIR, filename)
+    if not os.path.exists(path):
+        pd.DataFrame(columns).to_parquet(path, index=False)
+        print(f"  Created stub: {path}")
+    else:
+        print(f"  Already exists: {path}")
+PYEOF
+
 # ── feast apply ───────────────────────────────────────────────────────────────
 echo "[feast-startup] Applying Feast feature definitions ..."
 feast -c /feature-repo apply
